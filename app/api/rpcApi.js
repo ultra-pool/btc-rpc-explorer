@@ -150,11 +150,17 @@ function getRawTransaction(txid) {
 	debugLog("getRawTransaction: %s", txid);
 
 	return new Promise(function(resolve, reject) {
-		if (coins[config.coin].genesisCoinbaseTransactionId && txid == coins[config.coin].genesisCoinbaseTransactionId) {
+		if (coins[config.coin].genesisCoinbaseTransactionIdsByNetwork[global.activeBlockchain] && txid == coins[config.coin].genesisCoinbaseTransactionIdsByNetwork[global.activeBlockchain]) {
 			// copy the "confirmations" field from genesis block to the genesis-coinbase tx
 			getBlockchainInfo().then(function(blockchainInfoResult) {
-				var result = coins[config.coin].genesisCoinbaseTransaction;
+				var result = coins[config.coin].genesisCoinbaseTransactionsByNetwork[global.activeBlockchain];
 				result.confirmations = blockchainInfoResult.blocks;
+
+				// hack: default regtest node returns "0" for number of blocks, despite including a genesis block;
+				// to display this block without errors, tag it with 1 confirmation
+				if (global.activeBlockchain == "regtest" && result.confirmations == 0) {
+					result.confirmations = 1;
+				}
 
 				resolve(result);
 
@@ -269,6 +275,8 @@ function getRpcData(cmd) {
 		debugLog(`RPC: ${cmd}`);
 
 		rpcCall = function(callback) {
+			var client = (cmd == "gettxoutsetinfo" ? global.rpcClientNoTimeout : global.rpcClient);
+
 			client.command(cmd, function(err, result, resHeaders) {
 				if (err) {
 					utils.logError("32euofeege", err, {cmd:cmd});
@@ -295,7 +303,7 @@ function getRpcDataWithParams(request) {
 		debugLog(`RPC: ${JSON.stringify(request)}`);
 
 		rpcCall = function(callback) {
-			client.command([request], function(err, result, resHeaders) {
+			global.rpcClient.command([request], function(err, result, resHeaders) {
 				if (err != null) {
 					utils.logError("38eh39hdee", err, {result:result, headers:resHeaders});
 
